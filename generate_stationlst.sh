@@ -1,8 +1,8 @@
 #!/bin/bash
-seeddir=/projects/life9360/code/Programs/devSEED2CORpp_1.09/TEST/SEED
+seeddir=/rc_scratch/life9360/PO_COR/SEED
 #seeddir=/lustre/janus_scratch/life9360/COR_US_CONTINENT/SEED
 #lstdir=/lustre/janus_scratch/life9360/COR_US_CONTINENT/working_2004
-lstdir=/projects/life9360/code/Programs/devSEED2CORpp_1.09/TEST
+lstdir=/lustre/janus_scratch/life9360/COR_US_PO
 if [ -e station.lst ]; then
 	        rm -f station.lst
 fi

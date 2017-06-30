@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <iostream>
+
 /* 2012 Jul 22:  (BJG) Debugging statements are now shown only if
 one defines DEBUGGING_STATEMENTS.  The Vincenty routine will compute
 a back-azimuth only if you pass it a non-NULL pointer to 'back_azimuth'.
@@ -371,7 +373,25 @@ void vincenty_direct( const double lat1, const double lon1,
    *lon2 = lon1 + big_l;
 }
 
+int main()
+{
 
+	const double flattening = 1. / 298.257223563;
+	    const double semimajor = 6378.137;
+	        const double PI = 3.14159265358979323846;
+		    double azimuth, dist, back_azimuth,evla,evlo, stla, stlo;
+		        evla=30.*PI/180.0;
+			    evlo=-75.*PI/180.0;
+			        stla=30.*PI/180.0;
+				    stlo=-80.*PI/180.0;
+				    dist = vincenty_earth_dist( evla, evlo, stla, stlo, flattening, &azimuth,
+						                                    &back_azimuth);
+				    std::cout<<"az: "<<azimuth/PI*180.<<" baz: "<<back_azimuth/PI*180.-180.<<std::endl;
+
+
+
+
+}
 /* For the 'spherical earth' formula,  we use a radius of 6371 km (close to
 the average of the polar and equatorial radii.)  For the 'flattened earth',
 the equatorial radius of 6378.140 km is used. */

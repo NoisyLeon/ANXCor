@@ -1,33 +1,16 @@
 #!/bin/bash
-year=2010
-m=1
-mon=JAN
-seeddir=/rc_scratch/life9360/COR_US_CONTINENT/SEED
+seeddir=/lustre/janus_scratch/yeti4009/ASN_OBS/SEED
 #seeddir=/rc_scratch/life9360/BOSA_COR/SEED
 #seeddir=/rc_scratch/life9360/COR_TA_TEST/SEED
 #lstdir=/lustre/janus_scratch/life9360/COR_US_CONTINENT/working_${year}/seed.lst
 #lstdir=/lustre/janus_scratch/life9360/COR_US_CONTINENT/working_${year}/seed_${m}.lst
 #lstdir=/lustre/janus_scratch/life9360/COR_BOSA/seed.lst
-lstdir=/rc_scratch/life9360/COR_US_CONTINENT/seed.lst
+lstdir=/lustre/janus_scratch/life9360/seed.lst
 if [ -e seed.lst ]; then
         rm -f seed.lst
 fi
 cd $seeddir
-#ls USCON_${year}.${mon}*seed >> seed_fname.lst
-ls USCON_${year}.JAN*seed >> seed_fname.lst
-ls USCON_${year}.FEB*seed >> seed_fname.lst
-ls USCON_${year}.MAR*seed >> seed_fname.lst
-ls USCON_${year}.APR*seed >> seed_fname.lst
-ls USCON_${year}.MAY*seed >> seed_fname.lst
-ls USCON_${year}.JUN*seed >> seed_fname.lst
-#ls USCON_${year}.JUL*seed >> seed_fname.lst
-#ls USCON_${year}.AUG*seed >> seed_fname.lst
-#ls USCON_${year}.SEP*seed >> seed_fname.lst
-#ls USCON_${year}.OCT*seed >> seed_fname.lst
-#ls USCON_${year}.NOV*seed >> seed_fname.lst
-#ls USCON_${year}.DEC*seed >> seed_fname.lst
-#ls USCON_2008*seed >> seed_fname.lst
-#ls USCON_2009*seed >> seed_fname.lst
+ls HH*seed >> seed_fname.lst
 awk 'BEGIN {FS="."} ; {print $2,$3}' seed_fname.lst >monday.lst
 awk 'BEGIN {FS="."} ; {print $1}' seed_fname.lst  > year.lst
 awk 'BEGIN {FS="_"} ; {print $2}' year.lst  > year2.lst
@@ -40,6 +23,4 @@ done
 paste seed_fname2.lst year2.lst monday2.lst > seed1.lst
 awk '{print $1, $2, $3, $4 }' seed1.lst >seed.lst	
 rm year.lst year2.lst monday.lst monday2.lst seed_fname.lst seed_fname2.lst seed1.lst
-#mv seed.lst $lstdir/seed3.lst
-#mv seed.lst $lstdir/long_seed.lst
 mv seed.lst $lstdir

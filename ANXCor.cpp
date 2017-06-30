@@ -8,7 +8,6 @@
 #include "MyOMP.h"
 #include "SysTools.h"
 #include "CCRec.h"
-#include "StaPair.h"
 #include <ctime>
 #include <sys/time.h>
 #include <iostream>
@@ -23,12 +22,17 @@ void FNormAll( std::deque<SacRec>& sacV, const std::vector<DailyInfo>& dinfoV, b
 bool FileExists(const char* filename);
 bool FileExists(const std::string & filename);
 std::vector < std::string > GchannelList(CCDatabase & CDB);
-/* Generate CC to do List, by Lili Feng */
-void GCCtodoList( std::vector<StaPair> & CC_List, std::vector < StaInfo > & StaList, std::vector < std::string > & MDIR, std::vector < std::vector < std::string > > & CHAll, int skipccflag);
+void GStaMonList( std::vector < Station > & StaList, std::vector < std::string > & MDIR, CCDatabase & CDB);
+void GCCtodoList(std::vector < Station > & StaList, std::vector < std::string > & MDIR, std::vector<CC_todo> & CC_List, std::vector < std::string > & CHAN, int skipccflag);
 /* convert amp & ph files to CC, by Lili Feng */
-void CCList2CC( std::vector<StaPair> & CC_List, std::vector < std::vector < std::string > > ChanAll, CCDatabase & CDB);
+void CCList2CC( std::vector<CC_todo> & CC_List, std::vector < std::string > & CHAN, CCDatabase & CDB);
 /* daily component correction, by Lili Feng*/
 void Rotation_daily(std::deque < SacRec > & SACV, std::vector < std::string > Rout);
+/* stack CC data according to CCstack, by Lili Feng*/
+void StackAll(std::vector < Station > & StaList, std::vector < std::string > & MDIR, std::vector < std::string > & CHAN, CCDatabase & CDB);
+//bool checkflags(int esacflag, int respflag, int ampflag);
+/* rotate CC of ENZ to RTZ, by Lili Feng*/
+bool Rotation(sta_pairs & stapair, std::vector < std::string > & CHAN, std::vector < std::string > & DIR, std::string CHPRE);
 extern MyLogger logger;
 MyLogger logger;
 extern MEMO memo;
@@ -53,11 +57,7 @@ int main(int argc, char *argv[])
         float MemTotal = memo.MemTotal();
         logger.Hold( INFO, "Estimated total memory = "+std::to_string(MemTotal)+" Mb", FuncName );
         logger.flush();
-        std::vector < std::string > ExtractedStaLst, RemovedStaLst, ExistingStaLst;
-        float Cyear=-999;
-        float Cmonth=-999;
-        float Cday=-999;
-        bool newdayFlag=false;
+
         /* iterate through the database and handle all possible events */
         #pragma omp parallel
         {
@@ -69,93 +69,14 @@ int main(int argc, char *argv[])
                 bool got;
                 std::vector<DailyInfo> dinfoV;
                 #pragma omp critical(cdb)
-                {// critical S
+                {
+                    // critical S
                     got = cdb.GetRec_AllCH(dinfoV);
                     cdb.NextEvent();
                 } // critical E
-                #pragma omp critical(PRINT)
-                {
-                    if (newdayFlag==true)
-                    {
-                        bool outflag=false;
-                        if ( ExtractedStaLst.size()!=0)
-                        {
-                            std::cout<<"Extracted SAC files for: "<<Cyear<<"."<<Cmonth<<"."<<Cday<<":";
-                            for (int i=0; i<ExtractedStaLst.size(); i++)
-                                std::cout<<" "<<ExtractedStaLst[i]<<" ";
-                            std::cout<<" "<<std::endl;
-                            outflag=true;
-                            ExtractedStaLst.clear();
-                        }
-                        if ( ExistingStaLst.size()!=0)
-                        {
-                            std::cout<<"Existing SAC files for: "<<Cyear<<"."<<Cmonth<<"."<<Cday<<":";
-                            for (int i=0; i<ExistingStaLst.size(); i++)
-                                std::cout<<" "<<ExistingStaLst[i]<<" ";
-                            std::cout<<" "<<std::endl;
-                            outflag=true;
-                            ExistingStaLst.clear();
-                        }
-                        if ( RemovedStaLst.size()!=0)
-                        {
-                            std::cout<<"Removed SAC resp for: "<<Cyear<<"."<<Cmonth<<"."<<Cday<<":";
-                            for (int i=0; i<RemovedStaLst.size(); i++)
-                                std::cout<<" "<<RemovedStaLst[i]<<" ";
-                            std::cout<<" "<<std::endl;
-                            outflag=true;
-                            RemovedStaLst.clear();
-                        }
-                        if (outflag==true)
-                            std::cout<<"================================================================="<<std::endl;
-                        newdayFlag=false;
-                    }
-                }
-                if( !got )
-                {
-                    #pragma omp critical(PRINT)
-                    {
-                        if ( ExtractedStaLst.size()!=0)
-                        {
-                            std::cout<<"Extracted SAC files for: "<<Cyear<<"."<<Cmonth<<"."<<Cday<<":";
-                            for (int i=0; i<ExtractedStaLst.size(); i++)
-                                std::cout<<" "<<ExtractedStaLst[i]<<" ";
-                            std::cout<<" "<<std::endl;
-                            ExtractedStaLst.clear();
-                        }
-                        if ( ExistingStaLst.size()!=0)
-                        {
-                            std::cout<<"Existing SAC files for: "<<Cyear<<"."<<Cmonth<<"."<<Cday<<":";
-                            for (int i=0; i<ExistingStaLst.size(); i++)
-                                std::cout<<" "<<ExistingStaLst[i]<<" ";
-                            std::cout<<" "<<std::endl;
-                            ExistingStaLst.clear();
-                        }
-                        if ( RemovedStaLst.size()!=0)
-                        {
-                            std::cout<<"Removed SAC resp for: "<<Cyear<<"."<<Cmonth<<"."<<Cday<<":";
-                            for (int i=0; i<RemovedStaLst.size(); i++)
-                                std::cout<<" "<<RemovedStaLst[i]<<" ";
-                            std::cout<<" "<<std::endl;
-                            RemovedStaLst.clear();
-                        }
-                    }
-                    break;
-                }
-
-                #pragma omp critical(cdb)
-                {// critical S
-                    if (dinfoV[0].year!=Cyear || dinfoV[0].month!=Cmonth || dinfoV[0].day!=Cday)
-                    {
-                        if (Cyear!=-999)
-                            newdayFlag=true;
-                        Cyear=dinfoV[0].year;
-                        Cmonth=dinfoV[0].month;
-                        Cday=dinfoV[0].day;
-                    }
-                } // critical E
+                if( !got ) break;
                 if( cdb.GetParams().fskipesac==2 && cdb.GetParams().fskipresp==2 && cdb.GetParams().fskipamph==2 )
                     break;
-
                 try   // handle current event
                 {
                     std::deque<SacRec> sacV;
@@ -168,7 +89,7 @@ int main(int argc, char *argv[])
                         auto& dinfo = dinfoV[ich];
                         bool extract_flag=false;
                         /* daily info from the database */
-                        //logger.Hold( INFO, dinfo.seedname + " " + dinfo.staname + " " + dinfo.chname, FuncName );
+                        logger.Hold( INFO, dinfo.seedname + " " + dinfo.staname + " " + dinfo.chname, FuncName );
                         //std::cout<<"Scanning:"+dinfo.seedname + " " + dinfo.staname + " " + dinfo.chname<<std::endl;
                         /* stringstream for reporting */
                         auto& report = reportV[ich];
@@ -186,15 +107,8 @@ int main(int argc, char *argv[])
                             {
                                 extract_flag=true;
                                 sac.Write( dinfo.osac_outname );
-                                //logger.Hold( INFO,"Extracting SAC file: "+dinfo.osac_outname, FuncName );
+                                logger.Hold( INFO,"Extracting SAC file: "+dinfo.osac_outname, FuncName );
                                 //std::cout<<"Extracting SAC file: "<<dinfo.osac_outname<<std::endl;
-                                #pragma omp critical(PRINT)
-                                {
-//                                    std::stringstream ss;
-//                                    ss << dinfo.year<<"."<<dinfo.month<<"."<<dinfo.day;
-//                                    std::string DATE(ss.str());
-                                    ExtractedStaLst.push_back(dinfo.staname+"_"+dinfo.chname);
-                                }
                                 sacfout_O.push_back(dinfo.osac_outname);
                             }
                         }
@@ -231,12 +145,8 @@ int main(int argc, char *argv[])
                             }
                             if (FileExists(dinfo.osac_outname))
                             {
-                                //logger.Hold( INFO,"Reading exsting SAC file: "+dinfo.osac_outname, FuncName );
+                                logger.Hold( INFO,"Reading exsting SAC file: "+dinfo.osac_outname, FuncName );
                                 //std::cout<<"Reading exsting SAC file: "<<dinfo.osac_outname<<std::endl;
-                                #pragma omp critical(PRINT)
-                                {
-                                    ExistingStaLst.push_back(dinfo.staname+"_"+dinfo.chname);
-                                }
                                 sac.Load(dinfo.osac_outname);
                                 sacfout_O.push_back(dinfo.osac_outname);
                             }
@@ -252,10 +162,9 @@ int main(int argc, char *argv[])
                                 continue;
                             }
                         }
-                        if ( sac.shd.npts <=1 )   // Added 1.05--->1.06
-                        {
-                            std::cout<<"ATTENTION: Skip Preprocessing for: "<<dinfo.fsac_outname<<std::endl;
-                            continue;
+                        if ( sac.shd.npts <=1 ) { // Added 1.05--->1.06
+                                std::cout<<"ATTENTION: Skip Preprocessing for: "<<dinfo.fsac_outname<<std::endl;
+                                continue;
                         }
 
                         sac.RmRESP( dinfo.resp_outname, dinfo.perl*0.8, dinfo.perh*1.3, dinfo.evrexe );
@@ -264,11 +173,7 @@ int main(int argc, char *argv[])
                         sprintf( evtime, "%04d%02d%02d000000\0", dinfo.year, dinfo.month, dinfo.day );
                         sac.ZoomToEvent( evtime, -12345., -12345., dinfo.t1, dinfo.tlen );
                         sac.Write( dinfo.fsac_outname );
-                        // logger.Hold( INFO,"Removed resp SAC file: "+dinfo.fsac_outname, FuncName );
-                        #pragma omp critical(PRINT)
-                        {
-                            RemovedStaLst.push_back(dinfo.staname+"_"+dinfo.chname);
-                        }
+                        logger.Hold( INFO,"Removed resp SAC file: "+dinfo.fsac_outname, FuncName );
                         //std::cout<<"Removed resp SAC file: "<<dinfo.fsac_outname<<std::endl;
                         //sac.WriteHD("/usr/temp.SAC");
                         sacV.push_back( std::move(sac) );
@@ -306,7 +211,6 @@ int main(int argc, char *argv[])
                     }
                     // normalize
                     FNormAll( sacV, dinfoV, SyncNorm );
-                    //FNormAll( sacV, dinfoV, false );
                     // write am
                     for( int isac=0; isac<sacV.size(); isac++ )
                     {
@@ -350,25 +254,32 @@ int main(int argc, char *argv[])
         time_before = clock();
         if(cdb.GetParams().fskipcrco == 3) return 0;
         int fskipcc=cdb.GetParams().fskipcrco;
-        // Get channel list
-        std::vector < std::string > chanL1 = cdb.GchannelList( 1 );
-        std::vector < std::string > chanL2 = cdb.GchannelList( 2 );
-        std::vector < std::string > chanL3 = cdb.GchannelList( 3 );
-        std::vector < std::vector < std::string > > ChannelAll;
-        if ( ! chanL1.empty() )
-            ChannelAll.push_back(chanL1);
-        if ( ! chanL2.empty() )
-            ChannelAll.push_back(chanL2);
-        if ( ! chanL3.empty() )
-            ChannelAll.push_back(chanL3);
-        std::vector < StaInfo > stationlist=cdb.GStaList();
-        std::vector < std::string > monthdir=cdb.GMonLst();
-        std::vector< StaPair > CC_todolist;
-        GCCtodoList( CC_todolist, stationlist, monthdir,  ChannelAll, fskipcc ); // generate CC_todolist
-        CCList2CC( CC_todolist, ChannelAll, cdb ); // Do CC according to CC_todolist
+        std::vector < std::string > channel = GchannelList( cdb ); // generate channel list
+        std::string CH_pre;
+        CH_pre.append(channel[0].begin(),channel[0].end()-1);
+        std::vector < Station > stationlist;
+        std::vector < std::string > monthdir;
+        std::vector< CC_todo > CC_todolist;
+        GStaMonList( stationlist, monthdir, cdb ); // generate station list and monthdir list
+        GCCtodoList( stationlist, monthdir, CC_todolist, channel, fskipcc ); // generate CC_todolist
+        CCList2CC( CC_todolist, channel, cdb ); // Do CC according to CC_todolist
+        StackAll( stationlist, monthdir, channel, cdb );
+        /*---- Do Rotation ----*/
+        std::vector <sta_pairs> stapair_list;
+        for (int s1=0; s1<stationlist.size(); s1++)  // Generate CCtodo List
+            for (int s2=0; s2<stationlist.size(); s2++)
+            {
+                if (stationlist[s1].sta>stationlist[s2].sta || !stationlist[s1].checkdoCC(stationlist[s2]) ) continue;
+                stapair_list.push_back(sta_pairs(stationlist[s1].sta,stationlist[s2].sta));
+            }
+        std::vector< std::string > all_dir;
+        all_dir.push_back("COR");
+        #pragma omp parallel for
+        for (int i=0; i<stapair_list.size(); i++)
+            Rotation(stapair_list[i], channel, all_dir, CH_pre);
         /*---- CC code end here ----*/
         logger.Hold( INFO, "All threads finished.", FuncName );
-//        std::cout<<"Elapsed Time: "<<(float(clock()-time_before))/CLOCKS_PER_SEC<<" secs"<<std::endl;
+        std::cout<<"Elapsed Time: "<<(float(clock()-time_before))/CLOCKS_PER_SEC<<" secs"<<std::endl;
     }
     catch ( std::exception& e )
     {

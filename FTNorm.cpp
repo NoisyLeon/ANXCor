@@ -3,7 +3,6 @@
 #include <iostream>
 #include <vector>
 #include <deque>
-#include <cmath>
 
 bool FileExists(const char* filename);
 bool FileExists(const std::string& filename);
@@ -20,11 +19,6 @@ void TNormAll( std::deque<SacRec>& sacV, const std::vector<DailyInfo>& dinfoV, b
         auto& dinfo = dinfoV[isac];
         auto& sac = sacV[isac];
         if( !(sac.sig) ) continue;
-        ///////////////// For OBS
-        float mymean, mystd;
-        sac.MeanStd ( -12345.,  -12345., mymean, mystd );
-        sac.Mul(1./abs(mymean));
-        ////////////////
         /* apply normalizations and convert to am/ph */
         switch( dinfo.tnorm_flag )
         {

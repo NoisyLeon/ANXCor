@@ -1048,8 +1048,6 @@ bool SacRec::MeanStd ( float tbegin, float tend, int step, float& mean, float& s
         throw ErrorSR::EmptySig(FuncName);
 
     // store valid data points
-    if( tbegin == NaN ) tbegin = shd.b;
-    if( tend == NaN ) tend = shd.e;
     float maxfloat = std::numeric_limits<float>::max();
     int neff = 0, ibeg = nint((tbegin-shd.b)/shd.delta), iend = nint((tend-shd.b)/shd.delta+1.);
     std::vector<float> dataV;
