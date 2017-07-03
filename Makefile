@@ -1,15 +1,15 @@
 INST_DIR = $(HOME)/bin
 EXECUTABLE  = ANXCor
 
-cflags = -std=c++0x -O2 -fopenmp #-Wall -I${HOME}/usr/include
+cflags = -std=c++0x -O2 -fopenmp -I${HOME}/anaconda2/include#-Wall -I${HOME}/usr/include
 
-LDLIBS = -L${HOME}/usr/lib -fopenmp -lfftw3 
+LDLIBS = -L${HOME}/anaconda2/lib -fopenmp -lfftw3 
 
 CFLAGS = $(DBG) $(cflags)
 
 CC = g++
 
-DBG = -g 
+#DBG = -g 
 
 all : $(EXECUTABLE)
 

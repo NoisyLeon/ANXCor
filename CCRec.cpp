@@ -142,7 +142,7 @@ bool doCor(SacRec & out_CC, const SacRec & sac_am1, const SacRec & sac_ph1, cons
     {
         px = fftw_plan_dft_1d(Ns, CCsp, out_shifted, FFTW_BACKWARD, FFTW_ESTIMATE);
     }
-    if(isnan(sac_ph1.sig[0])||isnan(sac_ph2.sig[0])||isnan(sac_am1.sig[0])||isnan(sac_am2.sig[0]))
+    if(std::isnan(sac_ph1.sig[0]) || std::isnan(sac_ph2.sig[0]) || std::isnan(sac_am1.sig[0]) || std::isnan(sac_am2.sig[0]))
     {
         //logger.Hold( WARNING, "Skip CC due to NaN!" , FuncName );
         std::cout<<"Warning: Skip CC due to NaN!"<<std::endl;
