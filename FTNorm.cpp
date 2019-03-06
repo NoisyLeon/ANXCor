@@ -50,11 +50,11 @@ void TNormAll( std::deque<SacRec>& sacV, const std::vector<DailyInfo>& dinfoV, b
             }
             break;
         case 3:
-            throw std::runtime_error("EqkCut not exist!");/// TODO: add earthquake cutting normalization
+            throw std::runtime_error("EqkCut not exist!");// TODO: add earthquake cutting normalization
             break;
         }
     }
-    if( SyncNorm  && dinfoV[0].tnorm_flag==2 ) /// 1.02-->1.03
+    if( SyncNorm  && dinfoV[0].tnorm_flag==2 ) 
         for( auto& sac : sacV )
             if( sac.sig ) sac.Divf( sac_sigmax );
     //sacV[0].Write( "Test_RunAvg.sac" );

@@ -25,20 +25,20 @@ CCDatabase::CCDatabase( const std::string& fname )
 /* fill dinfo with parameters in CCParams */
 void CCDatabase::FillDInfo()
 {
-    dinfo.rdsexe = CCParams.rdsexe;
-    dinfo.evrexe = CCParams.evrexe;
-    dinfo.sps = CCParams.sps;
-    dinfo.perl = CCParams.perl;
-    dinfo.perh = CCParams.perh;
-    dinfo.t1 = CCParams.t1;
-    dinfo.tlen = CCParams.tlen;
-    dinfo.tnorm_flag = CCParams.tnorm_flag;
-    dinfo.timehlen = CCParams.timehlen;
-    dinfo.Eperl = CCParams.Eperl;
-    dinfo.Eperh = CCParams.Eperh;
-    dinfo.frechlen = CCParams.frechlen;
-    dinfo.memomax = CCParams.memomax;
-    dinfo_rdy = false;
+    dinfo.rdsexe        = CCParams.rdsexe;
+    dinfo.evrexe        = CCParams.evrexe;
+    dinfo.sps           = CCParams.sps;
+    dinfo.perl          = CCParams.perl;
+    dinfo.perh          = CCParams.perh;
+    dinfo.t1            = CCParams.t1;
+    dinfo.tlen          = CCParams.tlen;
+    dinfo.tnorm_flag    = CCParams.tnorm_flag;
+    dinfo.timehlen      = CCParams.timehlen;
+    dinfo.Eperl         = CCParams.Eperl;
+    dinfo.Eperh         = CCParams.Eperh;
+    dinfo.frechlen      = CCParams.frechlen;
+    dinfo.memomax       = CCParams.memomax;
+    dinfo_rdy           = false;
 }
 
 /* pull out the next daily record from the database */
@@ -62,16 +62,16 @@ bool CCDatabase::NextRecTest()
     if( seedlst.NotEnded() ) std::cerr<<*(seedlst.GetRec())<<std::endl;
 
     std::cerr<<*(stalst.GetRec())<<std::endl;
-    if( stalst.ReLocate( "J23A" ) )
+    if( stalst.ReLocate( "J23A", "TA" ) )
     {
         std::cerr<<*(stalst.GetRec())<<std::endl;
     }
-    if( stalst.ReLocate( "SAO" ) )
+    if( stalst.ReLocate( "SAO", "TA"  ) )
     {
         std::cerr<<*(stalst.GetRec())<<std::endl;
     }
     if( stalst.NextRec() ) std::cerr<<*(stalst.GetRec())<<std::endl;
-    if( stalst.ReLocate( "CMA" ) )
+    if( stalst.ReLocate( "CMA", "TA"  ) )
     {
         std::cerr<<*(stalst.GetRec())<<std::endl;
     }
@@ -161,6 +161,7 @@ bool FindInPath( const std::string fname, std::string& absname )
     }
     return false;
 }
+
 /* read in parameters for the CC Database from the inputfile */
 void CCPARAM::Load( const std::string fname )
 {
@@ -174,9 +175,9 @@ void CCPARAM::Load( const std::string fname )
     }
     fin.close();
 
-    //(*report)<<"### "<<nparam<<" succed loads from param file "<<fname<<". ###"<<std::endl;
-    std::cout<<"### "<<nparam<<" succed loads from param file "<<fname<<". ###"<<std::endl;
+    std::cout<<"### "<<nparam<<" succeed loads from parameter file "<<fname<<". ###"<<std::endl;
 }
+
 CCPARAM::SetRet CCPARAM::Set( const std::string& input )
 {
     std::stringstream sin(input);
@@ -313,6 +314,7 @@ CCPARAM::SetRet CCPARAM::Set( const std::string& input )
 
     return EmptyInfo;
 }
+
 bool CCPARAM::CheckAll()
 {
     /* check one parameter at a time (29 total) */
@@ -712,8 +714,6 @@ bool CCPARAM::CheckAll()
 
 }
 
-
-
 /*-------------------------------------- Channellist ----------------------------------------*/
 /* load in channel list from input channel info */
 void Channellist::Load( const std::string& chinfo )
@@ -744,10 +744,12 @@ static bool SameDate(const SeedInfo& a, const SeedInfo& b)
 {
     return ( a.year==b.year && a.month==b.month && a.day==b.day  );
 }
+
 static bool CompareDate(const SeedInfo& a, const SeedInfo& b)
 {
     return ( ( a.year<b.year ) || ( a.year==b.year && (a.month<b.month||(a.month==b.month&&a.day<b.day)) ) );
 }
+
 void Seedlist::Load( const std::string& fname )
 {
     //list = new std::vector<SeedInfo>;
@@ -799,12 +801,13 @@ struct StaFinder
     StaFinder(StaInfo b) : a(b) {}
     bool operator()(StaInfo b)
     {
-        return a.name.compare(b.name)==0;
+        return a.name.compare(b.name)==0 && a.netcode.compare(b.netcode)==0 ;
     }
 };
+
 void Stationlist::Load( const std::string& fname )
 {
-    //list = new std::vector<StaInfo>;
+
     std::ifstream fsta(fname);
     if( !fsta )
     {
@@ -816,18 +819,33 @@ void Stationlist::Load( const std::string& fname )
     for(; std::getline(fsta, buff);)
     {
         char stmp[buff.length()];
-        if( sscanf(buff.c_str(), "%s %f %f %d", stmp, &(SRtmp.lon), &(SRtmp.lat), &(SRtmp.CCflag)) != 4 )  /// modified by Leon
+        char nkmp[buff.length()];
+        // old, before 2019-03-03
+        //if( sscanf(buff.c_str(), "%s %f %f %d", stmp, &(SRtmp.lon), &(SRtmp.lat), &(SRtmp.CCflag)) != 4 )  
+        //{
+        //    std::cout<<"   For Station:  "<<stmp<<" no input CC flag, set to 1"<<std::endl;
+        //    SRtmp.CCflag = 1;
+        //    if( (sscanf(buff.c_str(),"%s %f %f", stmp, &(SRtmp.lon), &(SRtmp.lat))) != 3 )
+        //    {
+        //        std::cerr<<"Warning(Stationlist::Load): format error in file "<<fname<<std::endl;
+        //        continue;
+        //    }
+        //}
+        // new
+        if( sscanf(buff.c_str(), "%s %f %f %s %d", stmp, &(SRtmp.lon), &(SRtmp.lat), nkmp, &(SRtmp.CCflag)) != 5 )  
         {
-            std::cout<<"   For Station:  "<<stmp<<" no input CC flag, set to 1"<<std::endl;
-            SRtmp.CCflag=1;
-            if( (sscanf(buff.c_str(),"%s %f %f", stmp, &(SRtmp.lon), &(SRtmp.lat))) != 3 )
+            std::cout<<"   For Station: "<<nkmp<<"."<<stmp<<" no input CC flag, set to 1"<<std::endl;
+            SRtmp.CCflag = 1;
+            if( (sscanf(buff.c_str(),"%s %f %f %s", stmp, &(SRtmp.lon), &(SRtmp.lat), nkmp)) != 4 )
             {
                 std::cerr<<"Warning(Stationlist::Load): format error in file "<<fname<<std::endl;
                 continue;
             }
         }
-        SRtmp.name = stmp;
-        icurrent = find_if(list.begin(), list.end(), StaFinder(SRtmp) );
+        
+        SRtmp.name      = stmp;
+        SRtmp.netcode   = nkmp; // added on 2019-03-03
+        icurrent        = find_if(list.begin(), list.end(), StaFinder(SRtmp) );
         if( icurrent != list.end() )
         {
             if( *icurrent == SRtmp )
@@ -842,7 +860,6 @@ void Stationlist::Load( const std::string& fname )
             }
         }
         list.push_back(SRtmp);
-        //std::cerr<<list.back().fname<<" "<<list.back().lon<<" "<<list.back().lat<<std::endl;
     }
     fsta.close();
     std::cout<<"Stationlist::Load: "<<list.size()<<" stations loaded"<<std::endl;
@@ -851,9 +868,10 @@ void Stationlist::Load( const std::string& fname )
 
 /* Move icurrent to the next match of the input StaInfo
 	icurrent=.end() if no such match is found */
-bool Stationlist::ReLocate( const std::string& staname )
+bool Stationlist::ReLocate( const std::string& staname, const std::string& netname )
 {
-    StaInfo srkey(staname.c_str(), 0., 0.);
+    // StaInfo srkey(staname.c_str(), 0., 0.);
+    StaInfo srkey(staname.c_str(), netname.c_str(), 0., 0.);
     icurrent = find_if(list.begin(), list.end(), StaFinder(srkey) );
     if( icurrent>=list.end() || icurrent<list.begin() ) return false;
     return true;

@@ -16,9 +16,9 @@ struct SeedInfo
     SeedInfo(const char* inname, const int& yy, const int& mm, const int& dd)
     {
         if(inname)name.assign(inname);
-        year=yy;
-        month=mm;
-        day=dd;
+        year    = yy;
+        month   = mm;
+        day     = dd;
     }
     friend std::ostream& operator<< (std::ostream& o, const SeedInfo& sr)
     {
@@ -28,28 +28,49 @@ struct SeedInfo
 };
 
 
-/* station wrapper consists of stationname, longitude, and latitude */
+/* station wrapper consists of stationname, network code, longitude, and latitude */
 struct StaInfo
 {
-    std::string name;
+    std::string name, netcode;
     float lon, lat;
     int CCflag;
     StaInfo() : lon(0.), lat(0.) {}
-    StaInfo(const char* inname, const float& lonin, const float& latin)
+    
+    StaInfo(const char* inname, const char* innetcode, const float& lonin, const float& latin)
     {
         if(inname)name.assign(inname);
-        lon=lonin;
-        lat=latin;
+        if(innetcode)netcode.assign(innetcode);
+        lon = lonin;
+        lat = latin;
     }
+    
     friend bool operator== (StaInfo& a, StaInfo& b)
     {
-        return ( a.name.compare(b.name)==0 && a.lon==b.lon && a.lat==b.lat );
+        return ( a.name.compare(b.name)==0 && a.lon==b.lon && a.lat==b.lat && a.netcode.compare(b.netcode)==0 );
     }
+    
     friend std::ostream& operator<< (std::ostream& o, const StaInfo& sr)
     {
-        o<<"( "<<sr.name<<" "<<sr.lon<<" "<<sr.lat<<" "<<" )";
+        o<<"( "<<sr.name<<"."<<sr.netcode<<" "<<sr.lon<<" "<<sr.lat<<" "<<" )";
         return o;
     }
+    
+    bool checkdoCC(const StaInfo & STA )
+    {
+        if  (CCflag==STA.CCflag && CCflag==0)
+            return false;
+        else if(CCflag != STA.CCflag && CCflag != 0 && STA.CCflag != 0)
+            return false;
+        else if (CCflag< 0 && name == STA.name && netcode == STA.netcode)
+        {
+            std::cout << "GROUP: "<<CCflag<<std::endl;
+            std::cout<<"DO NOT DO AUTO"<<std::endl;
+            return false;
+        }
+        else
+            return true;
+    }
+    
 };
 
 
@@ -62,7 +83,7 @@ struct DailyInfoData
     std::string chname;
     std::string osac_outname, fsac_outname;
     std::string rec_outname, resp_outname;
-    std::string monthdir; /// added
+    std::string monthdir; 
     std::string outdir;
     float sps, perl, perh, t1, tlen;
     int tnorm_flag;
@@ -81,11 +102,13 @@ struct DailyInfo : public DailyInfoData
         "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
     };
 
-    std::string& seedname = seed.name;
-    std::string& staname = sta.name;
-    int& year = seed.year;
-    int& month = seed.month;
-    int& day = seed.day;
+    std::string& seedname   = seed.name;
+    std::string& staname    = sta.name;
+    std::string& netname    = sta.netcode; // added on 2019-03-04
+    
+    int& year   = seed.year;
+    int& month  = seed.month;
+    int& day    = seed.day;
 
     DailyInfo() {}
     DailyInfo( const SeedInfo sei, const StaInfo& sti, const std::string& chi )
@@ -101,19 +124,19 @@ struct DailyInfo : public DailyInfoData
 
     void Update( const SeedInfo sei, const StaInfo& sti, const std::string& chi )
     {
-        seed = sei;
-        sta = sti;
-        chname = chi;
-        std::string mdir = std::to_string(year) + "." + MonthName[month];
-        std::string ddir = mdir + "." + std::to_string(day);
-        outdir = mdir + "/" + ddir;
+        seed    = sei;
+        sta     = sti;
+        chname  = chi;
+        std::string mdir    = std::to_string(year) + "." + MonthName[month];
+        std::string ddir    = mdir + "." + std::to_string(day);
+        outdir              = mdir + "/" + ddir;
         MKDirs( outdir.c_str() );
-        std::string outname = ddir + "." + staname + "." + chname + ".SAC";
-        osac_outname = mdir + "/" + ddir + "/" + outname;
-        fsac_outname = mdir + "/" + ddir + "/ft_" + outname;
-        rec_outname = fsac_outname + "_rec"; // 1.07 -->1.08
-        resp_outname = mdir + "/" + ddir + "/" + "RESP.TA." + staname + ".." + chname;
-        monthdir=mdir;///added
+        std::string outname = ddir + "." + netname+"."+staname + "." + chname + ".SAC";
+        osac_outname        = mdir + "/" + ddir + "/" + outname;
+        fsac_outname        = mdir + "/" + ddir + "/ft_" + outname;
+        rec_outname         = fsac_outname + "_rec"; 
+        resp_outname        = mdir + "/" + ddir + "/" + "RESP." + netname+"."+staname + ".." + chname; // changed on 2019-03-04
+        monthdir            = mdir;
     }
 
     friend std::ostream& operator<< (std::ostream& o, DailyInfo& di)
@@ -208,7 +231,7 @@ public:
     void Load( const std::string& );
     /* search for the first match of the input staname and return true on success
        icurrent=.end() if no such match is found */
-    bool ReLocate( const std::string& staname );
+    bool ReLocate( const std::string& staname, const std::string& netname );
 };
 
 #endif

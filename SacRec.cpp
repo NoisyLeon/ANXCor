@@ -245,10 +245,10 @@ struct SacRec::SRimpl
             float gdamp = exp( alpha * ndiff * ndiff );
             *p = rand() * gdamp;
             slope = ( *p - *(p-step) ) * oostep;
-            for(int i=1; i<step; i++) *(p-step+i) = *(p-step) + slope * i;  // 1.05 --> 1.06
+            for(int i=1; i<step; i++) *(p-step+i) = *(p-step) + slope * i;  // bugfix
         }
         // generate tapered random numbers for the 2nd half
-        for(; p<pend; p+=step)  // 1.05 --> 1.06
+        for(; p<pend; p+=step)  // bugfix
         {
             int ndiff = (pend-p);
             float gdamp = exp( alpha * ndiff * ndiff );
@@ -260,7 +260,7 @@ struct SacRec::SRimpl
         // connect the last several points
         *pend = rand();
         slope = ( *pend - *p ) / ( pend - p );
-        for(int i=1; p+i<pend; i++) *(p+i) = *p + slope*i; // 1.05 --> 1.06
+        for(int i=1; p+i<pend; i++) *(p+i) = *p + slope*i; // bugfix
         // shift generated radom numbers to mean1 - mean2
 
         slope = (mean2 - mean1) / (pend - pbeg);

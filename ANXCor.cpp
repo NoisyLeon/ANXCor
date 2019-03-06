@@ -17,52 +17,55 @@
 
 /* normalize all sac files in sacV (simultaneously if SyncNorm==true) by Ye Tian*/
 void TNormAll( std::deque<SacRec>& sacV, const std::vector<DailyInfo>& dinfoV, bool SyncNorm);
-/* normalize and apply taper by Ye Tian*/
+/* normalize and apply taper*/
 void FNormAll( std::deque<SacRec>& sacV, const std::vector<DailyInfo>& dinfoV, bool SyncNorm);
 bool FileExists(const char* filename);
 bool FileExists(const std::string & filename);
-std::vector < std::string > GchannelList(CCDatabase & CDB);
-void GStaMonList( std::vector < Station > & StaList, std::vector < std::string > & MDIR, CCDatabase & CDB);
-void GCCtodoList(std::vector < Station > & StaList, std::vector < std::string > & MDIR, std::vector<CC_todo> & CC_List, std::vector < std::string > & CHAN, int skipccflag);
-/* convert amp & ph files to CC, by Lili Feng */
-void CCList2CC( std::vector<CC_todo> & CC_List, std::vector < std::string > & CHAN, CCDatabase & CDB);
-/* daily component correction, by Lili Feng*/
-void Rotation_daily(std::deque < SacRec > & SACV, std::vector < std::string > Rout);
-/* stack CC data according to CCstack, by Lili Feng*/
-void StackAll(std::vector < Station > & StaList, std::vector < std::string > & MDIR, std::vector < std::string > & CHAN, CCDatabase & CDB);
-//bool checkflags(int esacflag, int respflag, int ampflag);
-/* rotate CC of ENZ to RTZ, by Lili Feng*/
-bool Rotation(sta_pairs & stapair, std::vector < std::string > & CHAN, std::vector < std::string > & DIR, std::string CHPRE);
+
+void GCCtodoList(std::vector < StaInfo > & StaList, std::string & MDIR,
+                 std::vector<CC_todo> & CC_List, std::vector < std::string > & CHAN, int skipccflag);
+/* convert amp & ph files to xcorr */
+void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string > & CHAN, const CCPARAM & cdbParams);
+/* daily component correction*/
+//void Rotation_daily(std::deque < SacRec > & SACV, std::vector < std::string > Rout);
+
 extern MyLogger logger;
 MyLogger logger;
 extern MEMO memo;
 MEMO memo;
 
+
+
 int main(int argc, char *argv[])
 {
-    if(argc!=2)
+    if(argc!=2 && argc!=3)
     {
-        std::cerr<<"Usage: "<<argv[0]<<" [Parameters_file]"<<std::endl;
+        std::cerr<<"Usage: "<<argv[0]<<" [Parameters_file] [monthdir](optional, e.g. 2019.JAN)"<<std::endl;
         return -1;
     }
     bool SyncNorm = true;
-    logger.Rename("logs_Seed2Cor/Test");
-
+    if (argc == 2)
+        logger.Rename("logs_Seed2Cor/Test");
+    else
+    {
+        std::string name_logger(argv[2]);
+        name_logger = "logs_Seed2Cor/Test_" + name_logger;
+        logger.Rename(name_logger);
+    }
     try
     {
         /* Initialize the CC Database with the input parameter file */
-        CCDatabase cdb( argv[1] );
-        //const CCPARAM& cdbParams = cdb.GetParams();
+        CCDatabase cdb(argv[1]);
+        const CCPARAM& cdbParams = cdb.GetParams();
         /* check total memory available */
         float MemTotal = memo.MemTotal();
         logger.Hold( INFO, "Estimated total memory = "+std::to_string(MemTotal)+" Mb", FuncName );
         logger.flush();
-
         /* iterate through the database and handle all possible events */
         #pragma omp parallel
         {
             // parallel region S
-            while( 1 )   // main loop
+            while(1)   // main loop
             {
                 //int ithread = omp_get_thread_num();
                 /* dynamically assign events to threads, one at a time */
@@ -71,11 +74,11 @@ int main(int argc, char *argv[])
                 #pragma omp critical(cdb)
                 {
                     // critical S
-                    got = cdb.GetRec_AllCH(dinfoV);
+                    got     = cdb.GetRec_AllCH(dinfoV);
                     cdb.NextEvent();
-                } // critical E
+                }   // critical E
                 if( !got ) break;
-                if( cdb.GetParams().fskipesac==2 && cdb.GetParams().fskipresp==2 && cdb.GetParams().fskipamph==2 )
+                if( cdbParams.fskipesac==2 && cdbParams.fskipresp==2 && cdbParams.fskipamph==2 )
                     break;
                 try   // handle current event
                 {
@@ -83,40 +86,39 @@ int main(int argc, char *argv[])
                     std::vector < std::string > sacfout_R;
                     std::vector < std::string > sacfout_O;
                     std::vector<std::stringstream> reportV( dinfoV.size() );
+                    
                     /*----  STEP 1: seed to SAC file(removed response) ----*/
-                    for( int ich=0; ich<dinfoV.size(); ich++ )
+                    for( int ich=0; ich < dinfoV.size(); ich++ )
                     {
-                        auto& dinfo = dinfoV[ich];
+                        auto& dinfo     = dinfoV[ich];
                         bool extract_flag=false;
                         /* daily info from the database */
-                        logger.Hold( INFO, dinfo.seedname + " " + dinfo.staname + " " + dinfo.chname, FuncName );
-                        //std::cout<<"Scanning:"+dinfo.seedname + " " + dinfo.staname + " " + dinfo.chname<<std::endl;
+                        //logger.Hold( INFO, dinfo.seedname + " " + dinfo.staname + " " + dinfo.chname, FuncName );
                         /* stringstream for reporting */
-                        auto& report = reportV[ich];
+                        auto& report    = reportV[ich];
+                        
                         /* extract the original sac from seed */
                         SacRec sac( report );
-
-                        if ( cdb.GetParams().fskipesac==0 || ( ! FileExists(dinfo.osac_outname) && cdb.GetParams().fskipesac==1 ) ) ///
+                        if ( cdbParams.fskipesac == 0 || ( ! FileExists(dinfo.osac_outname) && cdbParams.fskipesac==1 ) ) 
                         {
-                            /// 1.02-->1.03, check if extract SAC file or not
                             float gapfrac;
                             sac.SetMaxMemForParallel( MemTotal * dinfo.memomax * 0.8 / omp_get_num_threads() );
                             SeedRec seedcur( dinfo.seedname, dinfo.rdsexe, report );
-                            if( seedcur.ExtractSac( dinfo.staname, dinfo.chname, dinfo.sps, dinfo.rec_outname,
+                            if( seedcur.ExtractSac( dinfo.staname, dinfo.netname, dinfo.chname, dinfo.sps, dinfo.rec_outname,
                                                     dinfo.resp_outname, gapfrac, sac ) )
                             {
-                                extract_flag=true;
+                                extract_flag    = true;
                                 sac.Write( dinfo.osac_outname );
-                                logger.Hold( INFO,"Extracting SAC file: "+dinfo.osac_outname, FuncName );
-                                //std::cout<<"Extracting SAC file: "<<dinfo.osac_outname<<std::endl;
+                                ////logger.Hold( INFO,"Extracting SAC file: "+dinfo.osac_outname, FuncName );
                                 sacfout_O.push_back(dinfo.osac_outname);
                             }
                         }
 
                         /* remove response and cut */
-                        if (  cdb.GetParams().fskipresp==2 || (FileExists(dinfo.fsac_outname) && cdb.GetParams().fskipresp==1)  ) // if do not do resp_sac step
+                        // if do not do removing response step
+                        if (  cdbParams.fskipresp==2 || (FileExists(dinfo.fsac_outname) && cdbParams.fskipresp==1)  ) 
                         {
-                            /// 1.02-->1.03, check if removed response SAC file exists or not
+                            
                             if (FileExists(dinfo.fsac_outname))
                             {
                                 sac.Load(dinfo.fsac_outname);
@@ -126,14 +128,17 @@ int main(int argc, char *argv[])
                             sacV.push_back( std::move(sac) );
                             continue;
                         }
-                        //FIND resp file!
-                        if (extract_flag==false)  /// !!! TODO!!! NEED to ensure we get the right resp file!
+                        
+                        //if extraction step is skipped
+                        if (extract_flag==false) 
                         {
+                            // Get the path to resp file
                             std::vector<std::string> resp_list;
-                            if (List((dinfo.outdir).c_str(), ("RESP*."+dinfo.staname+".*."+dinfo.chname).c_str(), 2, resp_list))
-                                dinfo.resp_outname=resp_list[0];
+                            if (List( (dinfo.outdir).c_str(), ("RESP*."+dinfo.netname+"."+dinfo.staname+".*."+dinfo.chname).c_str(), 2, resp_list))
+                                dinfo.resp_outname  = resp_list[0];
                             else
                             {
+                                // if resp file NOT found, check if ft_*SAC file exists, continue then
                                 if (FileExists(dinfo.fsac_outname))
                                 {
                                     sac.Load(dinfo.fsac_outname);
@@ -143,15 +148,16 @@ int main(int argc, char *argv[])
                                 sacV.push_back( std::move(sac) );
                                 continue;
                             }
+                            
                             if (FileExists(dinfo.osac_outname))
                             {
-                                logger.Hold( INFO,"Reading exsting SAC file: "+dinfo.osac_outname, FuncName );
-                                //std::cout<<"Reading exsting SAC file: "<<dinfo.osac_outname<<std::endl;
+                                ////logger.Hold( INFO,"Reading existing SAC file: "+dinfo.osac_outname, FuncName );
                                 sac.Load(dinfo.osac_outname);
                                 sacfout_O.push_back(dinfo.osac_outname);
                             }
                             else
                             {
+                                // if original SAC file NOT found, check if ft_*SAC file exists, continue then
                                 if (FileExists(dinfo.fsac_outname))
                                 {
                                     sac.Load(dinfo.fsac_outname);
@@ -162,23 +168,22 @@ int main(int argc, char *argv[])
                                 continue;
                             }
                         }
-                        if ( sac.shd.npts <=1 ) { // Added 1.05--->1.06
+                        
+                        if ( sac.shd.npts <=1 ) { 
                                 std::cout<<"ATTENTION: Skip Preprocessing for: "<<dinfo.fsac_outname<<std::endl;
                                 continue;
                         }
-
+                        
+                        //  remove response
                         sac.RmRESP( dinfo.resp_outname, dinfo.perl*0.8, dinfo.perh*1.3, dinfo.evrexe );
-                        //std::cout<<"Extracting SAC file: "<<dinfo.osac_outname<<std::endl;
                         char evtime[15];
                         sprintf( evtime, "%04d%02d%02d000000\0", dinfo.year, dinfo.month, dinfo.day );
                         sac.ZoomToEvent( evtime, -12345., -12345., dinfo.t1, dinfo.tlen );
                         sac.Write( dinfo.fsac_outname );
-                        logger.Hold( INFO,"Removed resp SAC file: "+dinfo.fsac_outname, FuncName );
-                        //std::cout<<"Removed resp SAC file: "<<dinfo.fsac_outname<<std::endl;
-                        //sac.WriteHD("/usr/temp.SAC");
                         sacV.push_back( std::move(sac) );
                         sacfout_R.push_back(dinfo.fsac_outname);
                     }
+                    
                     /*--- Component correction ---*/
                     /*float del=3.0;
                     if (sacV.size()==dinfoV.size() && sacV.size()> 1 &&sacV.size()<4)
@@ -187,26 +192,42 @@ int main(int argc, char *argv[])
                         if ( abs(sacV[0].shd.cmpaz-90.0 ) > del && sacV[0].sig && sacV[1].sig)
                             Rotation_daily(sacV, sacfout_R);
                     } */
-                    if ( cdb.GetParams().fskipamph==2 ||
-                            (  FileExists(dinfoV[0].fsac_outname+".am")  && FileExists(dinfoV[0].fsac_outname+".ph")  &&
-                               FileExists(dinfoV[1].fsac_outname+".am")  && FileExists(dinfoV[1].fsac_outname+".ph") &&
-                               FileExists(dinfoV[2].fsac_outname+".am")  && FileExists(dinfoV[2].fsac_outname+".ph")  )
-                            && cdb.GetParams().fskipamph ==1) continue; /// 1.02-->1.03, check if convert SAC to amp&ph file
-
+                    
+                    /*----  STEP 2: convert SAC to amp&ph file ----*/
+                    if ( cdbParams.fskipamph == 2)
+                        continue;
+                    if (cdbParams.fskipamph == 1)
+                    {
+                        bool skip_amph_flag  = false;
+                        for ( int ich=0; ich < dinfoV.size(); ich++ )
+                        {
+                            if ( FileExists(dinfoV[ich].fsac_outname+".am") == false)
+                            {
+                                skip_amph_flag  = true;
+                                break;
+                            }
+                            if ( FileExists(dinfoV[ich].fsac_outname+".ph") == false)
+                            {
+                                skip_amph_flag  = true;
+                                break;
+                            }
+                        }
+                        if (skip_amph_flag)
+                        continue;
+                    }
+                    
                     /* time-domain normalization */
                     TNormAll( sacV, dinfoV, SyncNorm );
-
                     /* fre-domain normalization */
                     // convert sacs to am&ph and store amp in sacV
                     for( int isac=0; isac<sacV.size(); isac++ )
                     {
                         auto& dinfo = dinfoV[isac];
-                        auto& sac = sacV[isac];
+                        auto& sac   = sacV[isac];
                         if( ! sac.sig ) continue;
                         SacRec sac_am, sac_ph;
                         sac.ToAmPh( sac_am, sac_ph );
-                        sac = std::move(sac_am); ///???
-                        //sac = sac_am;
+                        sac         = std::move(sac_am); 
                         sac_ph.Write( dinfo.fsac_outname + ".ph" );
                     }
                     // normalize
@@ -219,19 +240,24 @@ int main(int argc, char *argv[])
                         if( ! sac.sig ) continue;
                         sac.Write( dinfo.fsac_outname + ".am" );
                     }
-                    // End of removed SAC file to amp&ph file
-                    if (cdb.GetParams().fdelosac==1)
+                    
+                    // Remove raw or removed-resp SAC files
+                    if (cdbParams.fdelosac==1)
                         for (int isac=0; isac<sacfout_O.size(); isac++ )
-                            if (FileExists(sacfout_O[isac])) fRemove(sacfout_O[isac].c_str());/// 1.02-->1.03
-                    if (cdb.GetParams().fdelosac==2)
+                            if (FileExists(sacfout_O[isac]))
+                                fRemove(sacfout_O[isac].c_str());
+                    if (cdbParams.fdelosac==2)
                         for (int isac=0; isac<sacfout_R.size(); isac++ )
-                            if (FileExists(sacfout_R[isac])) fRemove(sacfout_R[isac].c_str());/// 1.02-->1.03
-                    if (cdb.GetParams().fdelosac==3)
+                            if (FileExists(sacfout_R[isac]))
+                                fRemove(sacfout_R[isac].c_str());
+                    if (cdbParams.fdelosac==3)
                     {
                         for (int isac=0; isac<sacfout_R.size(); isac++ )
-                            if (FileExists(sacfout_R[isac])) fRemove(sacfout_R[isac].c_str()); /// 1.02-->1.03
+                            if (FileExists(sacfout_R[isac]))
+                                fRemove(sacfout_R[isac].c_str()); 
                         for (int isac=0; isac<sacfout_O.size(); isac++ )
-                            if (FileExists(sacfout_O[isac])) fRemove(sacfout_O[isac].c_str());/// 1.02-->1.03
+                            if (FileExists(sacfout_O[isac]))
+                                fRemove(sacfout_O[isac].c_str());
                     }
                     /* log if any warning */
                     for( const auto& report : reportV )
@@ -241,6 +267,10 @@ int main(int argc, char *argv[])
                             logger.Hold( WARNING, "\n" + warning, FuncName );
                         logger.flush();
                     } // for dinfo
+                
+                std::string mesg    = "Preprocess done ::: "+ std::to_string(dinfoV[0].year)+"-"+std::to_string(dinfoV[0].month)+"-"+std::to_string(dinfoV[0].day)
+                                +" "+ dinfoV[0].netname +"."+dinfoV[0].staname;
+                logger.Hold( INFO, mesg, FuncName );
                 }
                 catch ( std::exception& e )
                 {
@@ -248,35 +278,84 @@ int main(int argc, char *argv[])
                 } // current event done
             } // main while loop
         } // parallel region E
-
-        /*---- CC code start here, by Lili Feng----*/
+        
+        
+        /*---- CC code start here ----*/
         clock_t time_before;
         time_before = clock();
-        if(cdb.GetParams().fskipcrco == 3) return 0;
-        int fskipcc=cdb.GetParams().fskipcrco;
-        std::vector < std::string > channel = GchannelList( cdb ); // generate channel list
-        std::string CH_pre;
+        if(cdbParams.fskipcrco == 3) return 0;
+        int fskipcc = cdbParams.fskipcrco;
+        //------------------------
+        // Get channel list
+        //------------------------
+        std::vector < std::string > channel;
+        Channellist temp_chlst  = cdb.GetchList();
+        for( temp_chlst.Rewind(); !temp_chlst.IsEnded(); temp_chlst.NextRec() )
+            channel.push_back(*(temp_chlst.GetRec()));
+        std::string CH_pre; // channel prefix
         CH_pre.append(channel[0].begin(),channel[0].end()-1);
-        std::vector < Station > stationlist;
+        //------------------------
+        // Get station list
+        //------------------------
+        std::vector < StaInfo > stationlist;
+        Stationlist temp_stalst = cdb.GetstaList();
+        for( temp_stalst.Rewind(); !temp_stalst.IsEnded(); temp_stalst.NextRec() )
+            stationlist.push_back( *(temp_stalst.GetRec()) );
+        ////for( int ista=0; ista < stationlist.size(); ista++ )
+        ////    std::cout << stationlist[ista].netcode<<"."<<stationlist[ista].name<<std::endl;
+        //------------------------
+        // Get month list
+        //------------------------
         std::vector < std::string > monthdir;
-        std::vector< CC_todo > CC_todolist;
-        GStaMonList( stationlist, monthdir, cdb ); // generate station list and monthdir list
-        GCCtodoList( stationlist, monthdir, CC_todolist, channel, fskipcc ); // generate CC_todolist
-        CCList2CC( CC_todolist, channel, cdb ); // Do CC according to CC_todolist
-        StackAll( stationlist, monthdir, channel, cdb );
-        /*---- Do Rotation ----*/
-        std::vector <sta_pairs> stapair_list;
-        for (int s1=0; s1<stationlist.size(); s1++)  // Generate CCtodo List
-            for (int s2=0; s2<stationlist.size(); s2++)
+        const std::vector<std::string> month_dict
+        {
+            "INVALID",
+            "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+            "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+        };
+        Seedlist temp_seedlst   = cdb.GetSeedList();
+        bool new_month  = true;
+        int temp_month  = -1;
+        int temp_year   = -1;
+        for( temp_seedlst.Rewind(); !temp_seedlst.IsEnded(); temp_seedlst.NextRec() )
+        {
+            SeedInfo temp_seedinfo  = *(temp_seedlst.GetRec());
+            if (temp_year != temp_seedinfo.year || temp_month != temp_seedinfo.month)
+                new_month   = true;
+            if (new_month)
             {
-                if (stationlist[s1].sta>stationlist[s2].sta || !stationlist[s1].checkdoCC(stationlist[s2]) ) continue;
-                stapair_list.push_back(sta_pairs(stationlist[s1].sta,stationlist[s2].sta));
+                monthdir.push_back( std::to_string(temp_seedinfo.year)+"."+month_dict[temp_seedinfo.month]);
+                new_month   = false;
+                temp_year   = temp_seedinfo.year;
+                temp_month  = temp_seedinfo.month;
             }
-        std::vector< std::string > all_dir;
-        all_dir.push_back("COR");
-        #pragma omp parallel for
-        for (int i=0; i<stapair_list.size(); i++)
-            Rotation(stapair_list[i], channel, all_dir, CH_pre);
+        }
+        bool in_monlst      = false;
+        if (argc == 3)
+        {
+            for( int imon=0; imon < monthdir.size(); imon++ )
+                if (monthdir[imon] == argv[2])
+                    in_monlst   = true;
+            if (! in_monlst)
+                std::cout << argv[2]<<" NOT in the month list"<<std::endl;
+        }
+        //------------------------------------------------
+        // perform cross-correlation month by month
+        //----------------------------------------------
+        for( int imon=0; imon < monthdir.size(); imon++ )
+        {
+            if (in_monlst && monthdir[imon] != argv[2])
+                continue;
+            std::vector< CC_todo > CC_todolist;
+            GCCtodoList( stationlist, monthdir[imon], CC_todolist, channel, fskipcc );
+            std::cout <<"===== "<<monthdir[imon]<<":"<<CC_todolist.size()<<" pairs"<<std::endl;
+            //for ( int icc=0; icc < CC_todolist.size(); icc++ )
+            //    std::cout << CC_todolist[icc].station1.netcode+"."+CC_todolist[icc].station1.name+"_"
+            //            + CC_todolist[icc].station2.netcode+"."+CC_todolist[icc].station2.name+" ";
+            //std::cout<<std::endl;
+            CCList2CC( CC_todolist, channel, cdbParams );
+        }
+        
         /*---- CC code end here ----*/
         logger.Hold( INFO, "All threads finished.", FuncName );
         std::cout<<"Elapsed Time: "<<(float(clock()-time_before))/CLOCKS_PER_SEC<<" secs"<<std::endl;

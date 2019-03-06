@@ -60,12 +60,13 @@ public:
         return deno==1;
     }
 
-    bool RunRdseed( const std::string& staname, const std::string& chname, const std::string& tdir,
+    bool RunRdseed( const std::string& staname, const std::string& netname,
+                    const std::string& chname, const std::string& tdir,
                     std::string& fresp, std::vector<std::string> &filelist )
     {
         // check parameters
         if( rdsexe.empty() || fseed.empty() ||
-                staname.empty() || chname.empty() ) return false;
+                staname.empty() || chname.empty()||netname.empty() ) return false;
 
         if( access( rdsexe.c_str(), R_OK ) == -1 ||
                 access( fseed.c_str(), R_OK ) == -1 ) return false;
@@ -77,21 +78,21 @@ public:
         fprintf (ff, "%s\n", fseed.c_str());
         fprintf(ff,"\n");								/* out file */
         fprintf(ff,"\n");								/* volume */
-        fprintf(ff,"d\n");							/* option */
+        fprintf(ff,"d\n");							    /* option */
         fprintf(ff,"\n");								/* summary file */
-        fprintf(ff,"%s\n", staname.c_str() );	/* station list */
-        fprintf(ff,"%s\n", chname.c_str() );	/* channel list */
-        fprintf(ff,"\n");								/* network list */
-        fprintf(ff,"\n");								/* Loc Ids */
-        fprintf(ff,"1\n");							/* out format */
-        fprintf(ff,"N\n");							/* new version!!!!!!!!!! */
-        fprintf(ff,"N\n");							/* Output poles & zeroes */
-        fprintf(ff,"0\n");							/* Check Reversal */
-        fprintf(ff,"\n");								/* Select Data Type */
+        fprintf(ff,"%s\n", staname.c_str() );	        /* station list */
+        fprintf(ff,"%s\n", chname.c_str() );	        /* channel list */
+        fprintf(ff,"%s\n", netname.c_str() );			/* network list, changed on 2019-03-04 */
+        fprintf(ff,"\n");						        /* Loc Ids */
+        fprintf(ff,"1\n");						        /* out format */
+        fprintf(ff,"N\n");						        /* new version!!!!!!!!!! */
+        fprintf(ff,"N\n");						        /* Output poles & zeroes */
+        fprintf(ff,"0\n");						        /* Check Reversal */
+        fprintf(ff,"\n");						        /* Select Data Type */
         fprintf(ff,"\n");								/* Start Time */
         fprintf(ff,"\n");								/* End Time */
         fprintf(ff,"\n");								/* Sample Buffer Length  */
-        fprintf(ff,"Y\n");							/* Extract Responses */
+        fprintf(ff,"Y\n");							    /* Extract Responses */
         fprintf(ff,"quit\n");
         fprintf(ff,"END\n");
         fclose(ff);
@@ -104,7 +105,7 @@ public:
             system(str);
 
             /*---------- mv response file -----------*/
-            sprintf(str, "RESP.*.%s.*.%s", staname.c_str(), chname.c_str());
+            sprintf(str, "RESP.%s.%s.*.%s", netname.c_str(), staname.c_str(), chname.c_str() );
             //list RESP files in the current depth
             fresp.clear();
             if( List(".", str, 0, list_result) )
@@ -119,8 +120,7 @@ public:
 
         /*---------mv sac files and produce saclst---------*/
         //yyyy.ddd.hh.mm.ss.ffff.NN.SSSSS.LL.CCC.Q.SAC (rdseed naming convention; modify acordingly if the convention ever changes)
-        sprintf(str, "*.*.*.*.*.*.*.%s.*.%s.*.SAC", staname.c_str(), chname.c_str());
-        //if( list_result.size() == 0 ) return false;
+        sprintf(str, "*.*.*.*.*.*.%s.%s.*.%s.*.SAC", netname.c_str(), staname.c_str(), chname.c_str());
         return wMove(".", str, tdir.c_str(), filelist);
     }
 
@@ -187,9 +187,10 @@ SeedRec::~SeedRec() {}//{ dRemove(pimpl->tdir.c_str()); }
 extern MEMO memo;
 #include "MyOMP.h"
 /*---------------------------------------------------- Extract osac from seed file ----------------------------------------------------*/
-bool SeedRec::ExtractSac( const std::string& staname, const std::string& chname, const int sps,
-                          const std::string& rec_outname, const std::string& resp_outname,
-                          float& gapfrac, SacRec& sacout )
+bool SeedRec::ExtractSac( const std::string& staname, const std::string& netname,
+                            const std::string& chname, const int sps,
+                            const std::string& rec_outname, const std::string& resp_outname,
+                            float& gapfrac, SacRec& sacout )
 {
     /* random number generator */
     unsigned timeseed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -212,7 +213,7 @@ bool SeedRec::ExtractSac( const std::string& staname, const std::string& chname,
     /* extract sacs from the seed */
     std::string fresp;
     std::vector<std::string> filelst;
-    if( ! pimpl->RunRdseed( staname, chname, tdir, fresp, filelst ) )
+    if( ! pimpl->RunRdseed( staname, netname, chname, tdir, fresp, filelst ) )
     {
         //reports << " sac record not found from " << pimpl->fseed << "! " << std::endl;
         dRemove(tdir.c_str());
@@ -232,6 +233,7 @@ bool SeedRec::ExtractSac( const std::string& staname, const std::string& chname,
         sacnew.Resample(sps);
         sacout.merge(sacnew);
         fRemove(filelst.at(i).c_str());
+        ////std::cout<<"merged "<<filelst.at(i).c_str()<<std::endl;
         merged = true;
     }
     //delete [] filelst;
