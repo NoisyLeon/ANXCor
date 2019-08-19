@@ -1,9 +1,9 @@
 import os
 import obspy
 import glob
-datadir     = '/work2/leon/temp_working_2009_2011'
-start_date  ='20090101'
-end_date    ='20100430'
+datadir     = '/work2/leon/temp_working_2004_2008'
+start_date  ='20040401'
+end_date    ='20080531'
 stime       = obspy.UTCDateTime(start_date)
 etime       = obspy.UTCDateTime(end_date)
 monthdict   = {1: 'JAN', 2: 'FEB', 3: 'MAR', 4: 'APR', 5: 'MAY', 6: 'JUN', 7: 'JUL', 8: 'AUG', 9: 'SEP', 10: 'OCT', 11: 'NOV', 12: 'DEC'}
@@ -15,12 +15,15 @@ while(stime < etime):
         print 'Deleting data: '+str(stime.year)+'.'+monthdict[stime.month]
     dailydir    = datadir+'/'+str(stime.year)+'.'+monthdict[stime.month]+'/'+str(stime.year)+'.'+monthdict[stime.month]+'.'+str(stime.day)
     if os.path.isdir(dailydir):
-        resplst = glob.glob(dailydir+'/RESP*')
-        ftsaclst= glob.glob(dailydir+'/ft*SAC')
-        for respname in resplst:
-            os.remove(respname)
-        for ftsacname in ftsaclst:
-            os.remove(ftsacname)
+        ftamsaclst  = glob.glob(dailydir+'/ft*SAC.am')
+        ftphsaclst  = glob.glob(dailydir+'/ft*SAC.ph')
+        ftrecsaclst = glob.glob(dailydir+'/ft*SAC_rec')
+        for phfname in ftphsaclst:
+            os.remove(phfname)
+        for amfname in ftamsaclst:
+            os.remove(amfname)
+        for recfname in ftrecsaclst:
+            os.remove(recfname)
     else:
         print dailydir+' NOT exists!'
     if stime.month == 12 and stime.day == 31:
@@ -28,7 +31,3 @@ while(stime < etime):
         month   = 0
     else:
         stime.julday += 1
-    
-
-        
-    

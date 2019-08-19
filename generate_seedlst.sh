@@ -1,15 +1,15 @@
 #!/bin/bash
-seeddir=/work2/leon/COR_ALASKA_dir/seed_data
-lstdir=/work2/leon/benchmark_old/seed_benchmark.lst
+seeddir=/backup/leon/ALASKA_work_20190313_working/seed_data_20180101-20190101
+lstdir=/work1/leon/alaska_beamforming/seed_2018.lst
 if [ -e seed.lst ]; then
         rm -f seed.lst
 fi
 cd $seeddir
-ls AKALL_*OCT.11.*seed >> seed_fname.lst
-ls AKALL_*NOV.10.*seed >> seed_fname.lst
+#ls AKALL_*OCT.11.*seed >> seed_fname.lst
+#ls AKALL_*NOV.10.*seed >> seed_fname.lst
 #ls AKALL_2017*seed >> seed_fname.lst
 #ls AKALL_2018*seed >> seed_fname.lst
-#ls AKALL_2019*seed >> seed_fname.lst
+ls *2018*seed >> seed_fname.lst
 #ls AKALL_2015*seed >> seed_fname.lst
 awk 'BEGIN {FS="."} ; {print $2,$3}' seed_fname.lst >monday.lst
 awk 'BEGIN {FS="."} ; {print $1}' seed_fname.lst  > year.lst

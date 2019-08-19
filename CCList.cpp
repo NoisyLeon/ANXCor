@@ -41,8 +41,8 @@ void GCCtodoList(std::vector < StaInfo > & StaList, std::string & MDIR,
             }
             if(skip_mcc && skipccflag == 1)
             {
-                std::cout<<"CC File: "<<MDIR<<":"<<StaList[s1].netcode+"."+StaList[s1].name
-                        <<"_"<<StaList[s2].netcode+"."+StaList[s2].name<<" Exist! "<<std::endl;
+                //std::cout<<"CC File: "<<MDIR<<":"<<StaList[s1].netcode+"."+StaList[s1].name
+                //        <<"_"<<StaList[s2].netcode+"."+StaList[s2].name<<" Exist! "<<std::endl;
                 continue;
             }
             std::vector <int> daylst;
@@ -65,7 +65,7 @@ void GCCtodoList(std::vector < StaInfo > & StaList, std::string & MDIR,
                         break;
                     }
                 }
-                if (!all_existflag)
+                if ( !all_existflag )
                     continue;
                 daylst.push_back(d);
             }
@@ -98,7 +98,7 @@ void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string 
         {
             while (1)
             {
-                #pragma omp critical (ListNoinc)
+                #pragma omp critical
                 {
                     si++;
                     i   = si;
@@ -114,9 +114,10 @@ void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string 
                 std::string cor_dir             = CC_List[i].monthdir + "/COR/" + staid1;
                 const std::vector <int>  daylst = CC_List[i].daylst;
                 
-                std::vector < SacRec > m_sacV(CCsize);          // monthly sac list
-                bool init_month_sac_flag        = false;
+                std::vector < SacRec > m_sacV(CCsize);          // monthly sac vector
+                bool init_month_sac_flag        = false;        // if the monthly sac vector has been initialized or not
                 std::vector <std::string> m_foutname(CCsize);   // monthly output file name list
+                // set montly output file name
                 for (int j=0; j<CCsize; j++)
                 {
                     int ch1         = (int)(j/CHsize); 
@@ -127,13 +128,13 @@ void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string 
                 // loop over days
                 for( int iday=0; iday < daylst.size(); iday++ )
                 {
-                    std::vector < SacRec > d_sacV(CCsize);         // vector includes daily cross-correlation data
-                    std::vector < std::string> foutnameD(CCsize); // daily output file name list
+                    std::vector < SacRec > d_sacV(CCsize);          // vector includes daily cross-correlation data
+                    std::vector < std::string> foutnameD(CCsize);   // daily output file name list
                     std::vector < SacRec > sac_amV1(CHsize), sac_phV1(CHsize), sac_amV2(CHsize), sac_phV2(CHsize);
                     
                     const int day           = daylst[iday];
                     const std::string daydir= CC_List[i].monthdir+"."+std::to_string(day); 
-                    bool skipccflag         = false;
+                    bool skipccflag         = false;            // skip this day or not
                     // Read amp/ph files
                     for (int ch=0; ch<CHsize; ch++)
                     {
@@ -154,18 +155,20 @@ void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string 
                         foutnameD[j]= CC_List[i].monthdir+ "/COR_D/" + staid1 + "/COR_" +
                                       staid1 + "_" +CHAN[ch1] + "_" + staid2 + "_" + CHAN[ch2]  +
                                       "_" + std::to_string(day) + ".SAC";
-                        auto & d_sac                = d_sacV[j];
+                        //auto & d_sac                = d_sacV[j];
                         auto & foutname             = foutnameD[j];
                         const std::string infname1  = CC_List[i].monthdir+"/"+daydir+
                                                         "/ft_"+daydir+"."+staid1+"."+CHAN[ch1]+".SAC";
                         const std::string infname2  = CC_List[i].monthdir+"/"+daydir+
                                                         "/ft_"+daydir+"."+staid2+"."+CHAN[ch2]+".SAC";
-                        // Start to do CC
-                        d_sac.LoadHD(infname1+".am");
+                        // Start to do CC                        
+                        //d_sacV[j].LoadHD(infname1+".am");
+                        d_sacV[j].MutateAs(sac_amV1[ch1]);
                         std::string frec1           = infname1 + "_rec";
                         std::string frec2           = infname2 + "_rec";
                         
-                        if  (! doCor(d_sac, sac_amV1[ch1], sac_phV1[ch1], sac_amV2[ch2], sac_phV2[ch2], LagTime, fs, mintlen, tlen, ftlen, frec1, frec2))
+                        if  ( !doCor(d_sacV[j], sac_amV1[ch1], sac_phV1[ch1], sac_amV2[ch2], sac_phV2[ch2],
+                                     LagTime, fs, mintlen, tlen, ftlen, frec1, frec2) )
                         {
                             
                             std::string mesg    = "Error am&ph File CC: " + staid1 + "_" + CHAN[ch1]  +
@@ -184,15 +187,15 @@ void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string 
                                   " with " + staid2 + "_" + CHAN[ch2] + " Date: " +
                                   daydir + " ---- List No. " + std::to_string(i+1);
                             //logger.Hold( INFO, mesg, FuncName );
-                            //#pragma omp critical 
-                            //{
-                            //    std::cout<<mesg<<std::endl;
-                            //}
+                            #pragma omp critical 
+                            {
+                                std::cout<<mesg<<std::endl;
+                            }
                         }
                         
                         if (checkprec==1) // NEED TEST!
                         {
-                            if (d_sac.CheckPrecNoise())
+                            if (d_sacV[j].CheckPrecNoise())
                                 skipccflag  = true;
                             break;
                         }
@@ -200,7 +203,7 @@ void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string 
                         if (Coutflag != 0 )
                         {
                             MKDirs((CC_List[i].monthdir + "/COR_D/" + staid1).c_str());
-                            d_sac.Write(foutname); // Save daily CC data
+                            d_sacV[j].Write(foutname); // Save daily CC data
                         }
                     }
                     ////if (skipccflag)
@@ -212,7 +215,7 @@ void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string 
                     ////    }
                     ////}
                     // append monthly cross-correlation results
-                    if( Coutflag != 1 && !skipccflag)
+                    if( Coutflag != 1 && !skipccflag )
                     {
                         if (init_month_sac_flag)
                         {
@@ -230,6 +233,24 @@ void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string 
                             init_month_sac_flag = true;
                         }
                     }
+                    // clear memory
+                    for (int ch=0; ch<CHsize; ch++)
+                    {
+                        sac_amV1[ch].clear();
+                        sac_phV1[ch].clear();
+                        sac_amV2[ch].clear();
+                        sac_phV2[ch].clear();
+                    }
+                    sac_amV1.clear();
+                    sac_phV1.clear();
+                    sac_amV2.clear();
+                    sac_phV2.clear();
+                    
+                    for (int j=0; j<CCsize; j++)
+                    {
+                        d_sacV[j].clear();
+                    }
+                    d_sacV.clear();
                 }
                 // save monthly cross-correlation results
                 if( Coutflag != 1 && init_month_sac_flag)
@@ -245,6 +266,11 @@ void CCList2CC( std::vector<CC_todo> & CC_List, const std::vector < std::string 
                 {
                     std::string stapair_str = staid1 + "_"+staid2;
                     std::cout<<stapair_str<<" ";
+                }
+                // clear memory
+                for (int j=0; j<CCsize; j++)
+                {
+                    m_sacV[j].clear();
                 }
             }
         }

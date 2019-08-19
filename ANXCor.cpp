@@ -279,7 +279,6 @@ int main(int argc, char *argv[])
             } // main while loop
         } // parallel region E
         
-        
         /*---- CC code start here ----*/
         clock_t time_before;
         time_before = clock();
@@ -355,7 +354,6 @@ int main(int argc, char *argv[])
             //std::cout<<std::endl;
             CCList2CC( CC_todolist, channel, cdbParams );
         }
-        
         /*---- CC code end here ----*/
         logger.Hold( INFO, "All threads finished.", FuncName );
         std::cout<<"Elapsed Time: "<<(float(clock()-time_before))/CLOCKS_PER_SEC<<" secs"<<std::endl;

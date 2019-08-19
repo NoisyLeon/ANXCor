@@ -1,6 +1,6 @@
 #!/bin/bash
-seeddir=/work2/leon/COR_ALASKA_dir/seed_data
-lstdir=/work2/leon/benchmark_working_2001_2005/sta_2001_2005.lst
+seeddir=/work2/leon/COR_USCON_dir/seed_data
+lstdir=/work2/leon/temp_working_2009_2011/sta_2009_2011.lst
 #seeddir=/work2/leon/COR_AKCODA_dir/seed_data
 #lstdir=/work2/leon/test_AKCODA_dir/station_20181130.lst
 if [ -e station.lst ]; then
@@ -8,11 +8,12 @@ if [ -e station.lst ]; then
 fi
 cd $seeddir
 rm s1.lst
-ls AKALL_2001*seed >> seed_fname.lst
-ls AKALL_2002*seed >> seed_fname.lst
-ls AKALL_2003*seed >> seed_fname.lst
-ls AKALL_2004*seed >> seed_fname.lst
-ls AKALL_2005*seed >> seed_fname.lst
+ls *seed >> seed_fname.lst
+ls LF_2009*seed >> seed_fname.lst
+ls LF_2010*seed >> seed_fname.lst
+ls LF_2011*seed >> seed_fname.lst
+
+#ls AKALL_2015*seed >> seed_fname.lst
 #ls AKALL_*OCT.11.*seed >> seed_fname.lst
 #ls AKALL_*NOV.10.*seed >> seed_fname.lst
 

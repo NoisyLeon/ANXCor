@@ -26,14 +26,6 @@ struct CC_todo
 };
 
 
-
-
-
-
-
-
-
-
 struct hole_rec
 {
     int rec_b, rec_e;

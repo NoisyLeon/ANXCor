@@ -582,8 +582,8 @@ void SacRec::MutateAs ( const SacRec& recin )
 {
     pimpl.reset( new SRimpl(*(recin.pimpl)) );
     //fname = recin.fname;
-    report = recin.report;
-    shd = recin.shd;
+    report  = recin.report;
+    shd     = recin.shd;
     sig.reset(new float[recin.shd.npts]);
     if( ! sig )
         throw ErrorSR::MemError( FuncName, "new failed!");
@@ -601,16 +601,20 @@ float SacRec::MemConsumed() const
 /* load sac header from file 'fname' */
 void SacRec::LoadHD ()
 {
-    std::ifstream fsac(fname.c_str());
+
+    std::ifstream fsac(fname);
     if( ! fsac )
         throw ErrorSR::BadFile( FuncName, "reading from " + fname );
     //if( SHDMap.empty() ) pimpl->CreateSHDMap();
     //pthread_mutex_lock(&fiolock);
     size_t rdsize = sizeof(SAC_HD);
-    fsac.read( reinterpret_cast<char *>(&shd), rdsize );
-    if( fsac.gcount() != rdsize )
-        throw ErrorSR::BadFile( FuncName, "failed to retrieve sac header from " + fname );
-    fsac.close();
+    #pragma omp critical(SACIO)
+    {
+        fsac.read( reinterpret_cast<char *>(&shd), rdsize );
+        if( fsac.gcount() != rdsize )
+            throw ErrorSR::BadFile( FuncName, "failed to retrieve sac header from " + fname );
+        fsac.close();
+    }
     //pthread_mutex_unlock(&fiolock);
 }
 

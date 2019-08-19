@@ -66,10 +66,10 @@ void Rotation_daily(std::deque < SacRec > & SACV, std::vector < std::string > Ro
     }
 
     std::cout<< "ATTENTION: Daily component correction: "<<Rout[0]<< " and "<<Rout[1]<< std::endl;
-    const float PI=3.14159265358979323846;
-    float del=SACV[1].shd.cmpaz/180*PI;
-    auto & Corr_E=SACV[0];
-    auto & Corr_N=SACV[1]; // Corrected E and N component
+    const float PI  = 3.14159265358979323846;
+    float del       = SACV[1].shd.cmpaz/180*PI;
+    auto & Corr_E   = SACV[0];
+    auto & Corr_N   = SACV[1]; // Corrected E and N component
     float tempN,tempE;
     for (int i=0; i<SACV[0].shd.npts; i++)
     {
@@ -102,12 +102,12 @@ bool doCor(SacRec & out_CC, const SacRec & sac_am1, const SacRec & sac_ph1, cons
 {
     // xCorr function:
     // Definition: (sac1 x sac2)[n] = SIGMA( sac1[m] *sac2[m+n] )
-    int N   =sac_am1.shd.npts;
+    int N   = sac_am1.shd.npts;
     int Ns  = 2*N-1; ///??? or 2*N-1???
     std::complex<double> temp1,temp2;
     fftw_plan px;
-    fftw_complex * CCsp = (fftw_complex *) fftw_malloc(sizeof(fftw_complex) * Ns);
-    fftw_complex * out_shifted = (fftw_complex *) fftw_malloc(sizeof(fftw_complex) * Ns);
+    fftw_complex * CCsp         = (fftw_complex *) fftw_malloc(sizeof(fftw_complex) * Ns);
+    fftw_complex * out_shifted  = (fftw_complex *) fftw_malloc(sizeof(fftw_complex) * Ns);
     #pragma omp critical
     {
         px = fftw_plan_dft_1d(Ns, CCsp, out_shifted, FFTW_BACKWARD, FFTW_ESTIMATE);
@@ -119,8 +119,8 @@ bool doCor(SacRec & out_CC, const SacRec & sac_am1, const SacRec & sac_ph1, cons
         return false;
     }
     // set value for the first point of CCsp
-    temp1       = std::complex<double>(sac_am1.sig[0]*cos(sac_ph1.sig[0]),sac_am1.sig[0]*sin(sac_ph1.sig[0]));
-    temp2       = std::complex<double>(sac_am2.sig[0]*cos(sac_ph2.sig[0]),sac_am2.sig[0]*sin(sac_ph2.sig[0]));
+    temp1       = std::complex<double>( sac_am1.sig[0]*cos(sac_ph1.sig[0]), sac_am1.sig[0]*sin(sac_ph1.sig[0]) );
+    temp2       = std::complex<double>( sac_am2.sig[0]*cos(sac_ph2.sig[0]), sac_am2.sig[0]*sin(sac_ph2.sig[0]) );
     CCsp[0][0]  = (temp2*conj(temp1)).real();
     CCsp[0][1]  = (temp2*conj(temp1)).imag();
     // In frequency domain: conj(sac1) * sac2
@@ -169,6 +169,7 @@ bool doCor(SacRec & out_CC, const SacRec & sac_am1, const SacRec & sac_ph1, cons
         {
             out_CC.sig[lagn-k]  = seis_out[k]/Ns; // lagn-1 ~ 0
             out_CC.sig[lagn+k]  = seis_out[Ns-k]/Ns; // lagn +1 ~ 2*lagn
+            
             sums                = sums+seis_out[k]/Ns+seis_out[Ns-k]/Ns;
             depmax              = std::max(depmax,out_CC.sig[lagn-k]);
             depmax              = std::max(depmax,out_CC.sig[lagn+k]);
@@ -261,8 +262,8 @@ bool CalcRecCor( std::string & fname1, std::string fname2, float *cor_rec, int l
 {
     int t, irec1, irec2;
     int recB, recE;
-    int TLEN=(int)(tlen*fs)+1;
-    int recbeg, recend,n;
+    int TLEN    = (int)(tlen*fs)+1;
+    int recbeg, recend, n;
     FILE *fin1, *fin2;
     std::vector <hole_rec> sta1, sta2;
     //std::cout<<"f1 rec: "<<fname1<<std::endl;
@@ -288,22 +289,26 @@ bool CalcRecCor( std::string & fname1, std::string fname2, float *cor_rec, int l
         sta2.push_back(hole_rec(0, TLEN-1));
     for(t=0; t<=lagn; t++)
     {
-        cor_rec[lagn+t]=1;
-        cor_rec[lagn-t]=1;
+        cor_rec[lagn+t] = 1;
+        cor_rec[lagn-t] = 1;
         for(irec1=0; irec1<sta1.size(); irec1++)
         {
             for(irec2=0; irec2<sta2.size(); irec2++)
             {
-                if(sta1[irec1].rec_b >=sta2[irec2].rec_e-t) continue;
-                if(sta1[irec1].rec_e<=sta2[irec2].rec_b-t) break;
+                if(sta1[irec1].rec_b >=sta2[irec2].rec_e-t)
+                    continue;
+                if(sta1[irec1].rec_e<=sta2[irec2].rec_b-t)
+                    break;
                 recB = std::max(sta1[irec1].rec_b, sta2[irec2].rec_b-t);
                 recE = std::min(sta1[irec1].rec_e, sta2[irec2].rec_e-t);
                 cor_rec[lagn+t] += recE - recB;
             }
             for(irec2=0; irec2<sta2.size(); irec2++)
             {
-                if(sta1[irec1].rec_b >=sta2[irec2].rec_e+t) continue;
-                if(sta1[irec1].rec_e<=sta2[irec2].rec_b+t) break;
+                if(sta1[irec1].rec_b >=sta2[irec2].rec_e+t)
+                    continue;
+                if(sta1[irec1].rec_e<=sta2[irec2].rec_b+t)
+                    break;
                 recB = std::max(sta1[irec1].rec_b, sta2[irec2].rec_b+t);
                 recE = std::min(sta1[irec1].rec_e, sta2[irec2].rec_e+t);
                 cor_rec[lagn-t] += recE - recB;
